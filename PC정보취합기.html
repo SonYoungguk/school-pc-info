@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PC 정보 취합기</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171b22; --field: #10141a; --line: #2a313c;
+    --text: #e8ecf1; --muted: #8b95a5; --teal: #2dd4bf; --amber: #fbbf24; --rose: #fb7185;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .panel h2 { font-size: 15px; margin: 0 0 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .drop {
+    display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 26px 12px; text-align: center;
+    color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--teal); background: rgba(45, 212, 191, .07); color: var(--text); }
+  .drop strong { color: var(--text); }
+  label.fld { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  textarea, input[type=text] {
+    width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px; font: inherit; font-size: 14px;
+  }
+  textarea { min-height: 110px; resize: vertical; font-family: Consolas, "Malgun Gothic", monospace; }
+  input[type=text] { max-width: 220px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button {
+    font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--field); color: var(--text); padding: 8px 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--teal); }
+  button.primary { background: linear-gradient(135deg, #14b8a6, #2dd4bf); color: #04201c; border: 0; font-weight: 700; }
+  button.primary:disabled { opacity: .35; cursor: not-allowed; }
+  .status { font-size: 13px; margin-top: 10px; color: var(--muted); }
+  .status .err { color: var(--rose); display: block; }
+  .status .warn { color: var(--amber); display: block; }
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+  .chip b { color: var(--teal); }
+  .chip.warn b { color: var(--amber); }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tabs button.on { border-color: var(--teal); color: var(--teal); }
+  .tablewrap { overflow: auto; max-height: 460px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { position: sticky; top: 0; background: #1f2530; font-weight: 600; }
+  tr:hover td { background: rgba(255, 255, 255, .03); }
+  td.dim { color: var(--muted); }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>PC 정보 취합기</h1>
+  <p class="sub">선생님들께 받은 txt 파일을 올리면 엑셀 파일(전체 / IP별 / 장소별 / 사용연한별 시트)로 만들어 드립니다. 파일은 이 컴퓨터 밖으로 전송되지 않습니다.</p>
+
+  <section class="panel">
+    <h2>1. 받은 txt 파일 올리기</h2>
+    <p class="hint">여러 개를 한꺼번에 끌어다 놓거나 클릭해서 선택하세요. 나중에 더 올리면 이어서 추가됩니다.</p>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".txt,text/plain" multiple hidden>
+      <strong>여기에 txt 파일을 끌어다 놓기</strong><br>또는 클릭해서 선택
+    </label>
+    <div class="status" id="status"></div>
+    <div class="row" style="margin-top:10px"><button id="reset" hidden>모두 지우고 다시 시작</button></div>
+  </section>
+
+  <section class="panel">
+    <h2>2. 장소 명단 (선택)</h2>
+    <p class="hint">한 줄에 <b>성함, 장소</b> 형태로 적습니다. 엑셀에서 두 칸을 복사해 붙여넣어도 됩니다. 명단에 없는 분은 "미분류"로 모입니다.</p>
+    <label class="fld" for="places">예) 김철수, 교무실</label>
+    <textarea id="places" spellcheck="false" placeholder="김철수, 교무실&#10;이영희, 3학년 2반&#10;박민수, 과학실"></textarea>
+  </section>
+
+  <section class="panel">
+    <h2>3. 사용연한 구간 기준</h2>
+    <p class="hint">구간을 나누는 연수를 쉼표로 적습니다. 예: <b>3,5</b> → "3년 미만 / 3~5년 / 5년 이상"</p>
+    <input type="text" id="th" value="3,5" aria-label="사용연한 구간 기준">
+  </section>
+
+  <section class="panel" id="result" hidden>
+    <h2>결과 미리보기</h2>
+    <div class="summary" id="summary"></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="tablewrap" id="tablewrap"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="primary" id="download">엑셀 파일로 저장</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const store = {
+    get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  const FIELDS = ['성함', '컴퓨터이름', '제조년월', 'CPU', 'RAM', '유선IP', '수집일시'];
+  const files = new Map();   // 파일명#번호 -> { name, recs, error } (같은 파일명이 여러 개여도 덮어쓰지 않음)
+  let seq = 0;
+  let sheets = [];
+  let activeTab = 0;
+  let unmatched = [];
+
+  // ---------- 파일 읽기 ----------
+  function parseText(text) {
+    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) throw new Error('내용이 비어 있습니다');
+    const head = lines[0].split('\t').map(s => s.trim());
+    const idx = {};
+    FIELDS.forEach(f => { idx[f] = head.findIndex(h => h.startsWith(f)); });
+    if (idx['성함'] < 0) throw new Error('형식이 맞지 않습니다');
+    return lines.slice(1).map(l => {
+      const c = l.split('\t').map(s => s.trim());
+      const g = f => (idx[f] >= 0 ? c[idx[f]] || '' : '');
+      return { name: g('성함'), pc: g('컴퓨터이름'), made: g('제조년월'), cpu: g('CPU'),
+               ram: g('RAM'), ip: g('유선IP'), at: g('수집일시') };
+    }).filter(r => r.name);
+  }
+
+  async function readFile(f) {
+    try {
+      const buf = await f.arrayBuffer();
+      let text = new TextDecoder('utf-8').decode(buf);
+      if (!text.includes('성함')) text = new TextDecoder('euc-kr').decode(buf);
+      files.set(f.name + '#' + (seq++), { name: f.name, recs: parseText(text), error: null });
+    } catch (e) {
+      files.set(f.name + '#' + (seq++), { name: f.name, recs: [], error: e.message });
+    }
+  }
+
+  async function addFiles(list) {
+    for (const f of list) await readFile(f);
+    render();
+  }
+
+  // ---------- 설정 읽기 ----------
+  function parsePlaces() {
+    const map = new Map();
+    $('#places').value.split(/\r?\n/).forEach(line => {
+      const parts = line.split(/\t|,/).map(s => s.trim());
+      const name = parts[0], place = parts.slice(1).filter(Boolean).join(' ');
+      if (name && place && name !== '성함') map.set(name.replace(/\s+/g, ''), place);
+    });
+    return map;
+  }
+
+  function parseThresholds() {
+    const t = $('#th').value.split(/[,\s]+/).map(Number).filter(n => n > 0 && isFinite(n));
+    const u = [...new Set(t)].sort((a, b) => a - b);
+    return u.length ? u : [3, 5];
+  }
+
+  function bucketLabels(th) {
+    const out = [`${th[0]}년 미만`];
+    for (let i = 1; i < th.length; i++) out.push(`${th[i - 1]}~${th[i]}년`);
+    out.push(`${th[th.length - 1]}년 이상`);
+    return out;
+  }
+
+  // ---------- 가공 ----------
+  const IPV4 = /\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g;
+  const ko = (a, b) => String(a).localeCompare(String(b), 'ko');
+
+  function build() {
+    const th = parseThresholds();
+    const labels = bucketLabels(th);
+    const places = parsePlaces();
+    const now = new Date();
+    const nowM = now.getFullYear() * 12 + now.getMonth();
+
+    // 같은 사람 + 같은 컴퓨터는 가장 최근 것만
+    const uniq = new Map();
+    let dupFiles = 0;
+    for (const { recs } of files.values()) for (const r of recs) {
+      const k = r.name + '|' + r.pc;
+      const o = uniq.get(k);
+      if (o) { dupFiles++; if (r.at > o.at) uniq.set(k, r); } else uniq.set(k, r);
+    }
+
+    const ipCount = new Map();
+    const rows = [...uniq.values()].map(r => {
+      const m = /^(\d{4})-(\d{2})/.exec(r.made);
+      let years = null, bucket = labels.length;
+      if (m) {
+        years = Math.max(0, Math.round(((nowM - (+m[1] * 12 + +m[2] - 1)) / 12) * 10) / 10);
+        bucket = th.findIndex(t => years < t);
+        if (bucket < 0) bucket = th.length;
+      }
+      const ips = [...r.ip.matchAll(IPV4)].map(x => x[0]);
+      ips.forEach(ip => ipCount.set(ip, (ipCount.get(ip) || 0) + 1));
+      const first = r.ip.matchAll(IPV4).next().value;
+      const key = first ? ((+first[1]) * 16777216 + (+first[2]) * 65536 + (+first[3]) * 256 + (+first[4])) : Infinity;
+      const place = places.get(r.name.replace(/\s+/g, '')) || '미분류';
+      return { ...r, ips, ipKey: key, band: first ? `${first[1]}.${first[2]}.${first[3]}.x` : '-',
+               years, bucket, bucketLabel: m ? labels[bucket] : '확인 불가', place,
+               ramNum: r.ram !== '' && !isNaN(r.ram) ? Number(r.ram) : r.ram };
+    });
+    rows.forEach(r => { r.ipDup = r.ips.some(ip => ipCount.get(ip) > 1) ? '중복' : ''; });
+
+    unmatched = [...new Set(rows.filter(r => r.place === '미분류').map(r => r.name))].sort(ko);
+
+    const byName = (a, b) => ko(a.name, b.name);
+    const all = [...rows].sort(byName);
+    const byIp = [...rows].sort((a, b) => (a.ipKey === b.ipKey ? byName(a, b) : a.ipKey < b.ipKey ? -1 : 1));
+    const byPlace = [...rows].sort((a, b) =>
+      (a.place === '미분류') - (b.place === '미분류') || ko(a.place, b.place) || byName(a, b));
+    const byAge = [...rows].sort((a, b) => {
+      const ua = a.years === null, ub = b.years === null;
+      if (ua !== ub) return ua ? 1 : -1;
+      return b.bucket - a.bucket || (b.years ?? 0) - (a.years ?? 0) || byName(a, b);
+    });
+
+    sheets = [
+      { name: '전체', head: ['성함', '장소', '컴퓨터이름', '제조년월(추정)', '사용연수', '사용연한', 'CPU', 'RAM(GB)', '유선IP', '수집일시'],
+        rows: all.map(r => [r.name, r.place, r.pc, r.made, r.years ?? '', r.bucketLabel, r.cpu, r.ramNum, r.ip, r.at]) },
+      { name: 'IP별', head: ['IP 대역', '유선IP', '성함', '장소', '컴퓨터이름', 'IP중복'],
+        rows: byIp.map(r => [r.band, r.ip, r.name, r.place, r.pc, r.ipDup]) },
+      { name: '장소별', head: ['장소', '성함', '컴퓨터이름', '제조년월(추정)', '사용연한', 'CPU', 'RAM(GB)', '유선IP'],
+        rows: byPlace.map(r => [r.place, r.name, r.pc, r.made, r.bucketLabel, r.cpu, r.ramNum, r.ip]) },
+      { name: '사용연한별', head: ['사용연한', '성함', '장소', '컴퓨터이름', '제조년월(추정)', '사용연수', 'CPU', 'RAM(GB)'],
+        rows: byAge.map(r => [r.bucketLabel, r.name, r.place, r.pc, r.made, r.years ?? '', r.cpu, r.ramNum]) }
+    ];
+
+    return {
+      total: rows.length, dupFiles,
+      ipDup: rows.filter(r => r.ipDup).length,
+      noAge: rows.filter(r => r.years === null).length,
+      noWired: rows.filter(r => !r.ips.length).length
+    };
+  }
+
+  // ---------- 화면 ----------
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function render() {
+    const info = build();
+    const ok = [...files.values()].filter(f => !f.error).length;
+    const bad = [...files.values()].filter(f => f.error);
+
+    let st = files.size ? `파일 ${ok}개를 읽었습니다.` : '';
+    bad.forEach(f => { st += `<span class="err">읽지 못함: ${esc(f.name)} (${esc(f.error)})</span>`; });
+    if (info.dupFiles) st += `<span class="warn">같은 사람·같은 컴퓨터의 파일이 ${info.dupFiles}건 겹쳐서 가장 최근 것만 사용했습니다.</span>`;
+    $('#status').innerHTML = st;
+    $('#reset').hidden = !files.size;
+    $('#result').hidden = !info.total;
+    if (!info.total) return;
+
+    const chip = (label, n, warn) => `<span class="chip ${warn && n ? 'warn' : ''}">${label} <b>${n}</b></span>`;
+    $('#summary').innerHTML =
+      chip('PC', info.total + '대') +
+      chip('명단에 없는 분', unmatched.length + '명', true) +
+      chip('IP 중복', info.ipDup + '대', true) +
+      chip('유선 연결 없음', info.noWired + '대') +
+      chip('제조년월 확인 불가', info.noAge + '대', true);
+
+    if (activeTab >= sheets.length) activeTab = 0;
+    $('#tabs').innerHTML = sheets.map((s, i) =>
+      `<button data-i="${i}" class="${i === activeTab ? 'on' : ''}">${s.name} (${s.rows.length})</button>`).join('') +
+      (unmatched.length ? `<button id="addun" title="${esc(unmatched.join(', '))}">명단에 없는 분 ${unmatched.length}명을 명단 칸에 추가</button>` : '');
+
+    const s = sheets[activeTab];
+    $('#tablewrap').innerHTML = s.rows.length
+      ? `<table><thead><tr>${s.head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>` +
+        s.rows.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('') + '</tbody></table>'
+      : '<div class="empty">표시할 내용이 없습니다.</div>';
+  }
+
+  // ---------- 엑셀(xlsx) 만들기: 외부 라이브러리 없이 직접 작성 ----------
+  const enc = new TextEncoder();
+  const CRC = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  const crc32 = d => { let c = 0xFFFFFFFF; for (let i = 0; i < d.length; i++) c = CRC[(c ^ d[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+
+  function zip(entries) {
+    const now = new Date();
+    const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [], central = [];
+    let offset = 0;
+    for (const e of entries) {
+      const name = enc.encode(e.name), data = enc.encode(e.text), crc = crc32(data);
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint16(10, time, true); lh.setUint16(12, date, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+      lh.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(lh.buffer), name, data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint16(12, time, true); ch.setUint16(14, date, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+      ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + data.length;
+    }
+    const csize = central.reduce((n, p) => n + p.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+    end.setUint32(12, csize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, new Uint8Array(end.buffer)],
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+
+  const xmlEsc = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const colName = i => { let s = ''; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
+  const textWidth = s => [...String(s)].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
+
+  function sheetXml(s, first) {
+    const all = [s.head, ...s.rows];
+    const widths = s.head.map((_, c) => Math.min(60, Math.max(8, ...all.map(r => textWidth(r[c] ?? '')) ) + 2));
+    const cell = (v, r, c, style) => {
+      const ref = colName(c) + (r + 1);
+      if (typeof v === 'number' && isFinite(v)) return `<c r="${ref}"${style ? ` s="${style}"` : ''}><v>${v}</v></c>`;
+      if (v === '' || v == null) return '';
+      return `<c r="${ref}" t="inlineStr"${style ? ` s="${style}"` : ''}><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+    };
+    const rowsXml = all.map((row, r) =>
+      `<row r="${r + 1}">${row.map((v, c) => cell(v, r, c, r === 0 ? 1 : 0)).join('')}</row>`).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      `<sheetViews><sheetView workbookViewId="0"${first ? ' tabSelected="1"' : ''}><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+      `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` +
+      `<sheetData>${rowsXml}</sheetData>` +
+      `<autoFilter ref="A1:${colName(s.head.length - 1)}${all.length}"/></worksheet>`;
+  }
+
+  function buildXlsx() {
+    const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const NS = 'http://schemas.openxmlformats.org/';
+    const entries = [
+      { name: '[Content_Types].xml', text: X + `<Types xmlns="${NS}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+        sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>' },
+      { name: '_rels/.rels', text: X + `<Relationships xmlns="${NS}package/2006/relationships"><Relationship Id="rId1" Type="${NS}officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+      { name: 'xl/workbook.xml', text: X + `<workbook xmlns="${NS}spreadsheetml/2006/main" xmlns:r="${NS}officeDocument/2006/relationships"><sheets>` +
+        sheets.map((s, i) => `<sheet name="${xmlEsc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>' },
+      { name: 'xl/_rels/workbook.xml.rels', text: X + `<Relationships xmlns="${NS}package/2006/relationships">` +
+        sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${NS}officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') +
+        `<Relationship Id="rId${sheets.length + 1}" Type="${NS}officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+      { name: 'xl/styles.xml', text: X + `<styleSheet xmlns="${NS}spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>` },
+      ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, text: sheetXml(s, i === 0) }))
+    ];
+    return zip(entries);
+  }
+
+  function download() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(buildXlsx());
+    a.download = `PC현황_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ---------- 이벤트 ----------
+  const drop = $('#drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+  $('#file').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+  $('#reset').addEventListener('click', () => { files.clear(); render(); });
+  $('#download').addEventListener('click', download);
+  $('#tabs').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.id === 'addun') {
+      const ta = $('#places');
+      ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + unmatched.map(n => n + ', ').join('\n');
+      store.set('pcinfo.places', ta.value);
+      render();
+    } else { activeTab = +b.dataset.i; render(); }
+  });
+  $('#places').addEventListener('input', () => { store.set('pcinfo.places', $('#places').value); render(); });
+  $('#th').addEventListener('input', () => { store.set('pcinfo.th', $('#th').value); render(); });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => e.preventDefault());
+
+  $('#places').value = store.get('pcinfo.places', '');
+  $('#th').value = store.get('pcinfo.th', '3,5');
+  render();
+})();
+</script>
+</body>
+</html>
